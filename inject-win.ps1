@@ -1,8 +1,8 @@
-#!/usr/bin/env pwsh
+#!/usr/bin/env -S pwsh -nop -nol
 #requires -version 3
 
 <#PSScriptInfo
-.VERSION 1.5.2
+.VERSION 2.0.1
 .GUID 702d7de5-2805-4d25-92fa-4aa08148b894
 .AUTHOR Faizal Hamzah
 .PROJECTURI http://github.com/thefirefox12537/ota_f17a1h_injector.git
@@ -15,7 +15,7 @@
 
 <#
 .SYNOPSIS
-Haier_F17A1H OTA Updater Injector
+OTA Haier F17A1H/Andromax Prime Injector Tool
 .DESCRIPTION
 Tool ini berguna bagi pengguna Haier F17A1H (Andromax Prime) yang mau di update offline atau ingin di root.
 .INPUTS
@@ -27,32 +27,33 @@ Run inject-win.ps1 without arguments to view help usage.
 #>
 
 # Date created:   12/08/2021  4:11pm
-# Date modified:  02/26/2022  5:48am
+# Date modified:  07/03/2022 12:10am
 
-$ErrorActionPreference = 'Stop'
-if ($IsLinux -or $IsMacOS)
-{Write-Error "This script requires Microsoft Windows Operating System."}
-if ($PSVersionTable.PSVersion -lt (New-Object Version 4,0))
-{Write-Error "This script requires Windows Module Framework (PowerShell) version 4.0"}
-if ([System.Enum]::GetNames([System.Net.SecurityProtocolType]) -notcontains 'Tls12')
-{Write-Error "This script requires at least .NET Framework version 4.5"}
+$ErrorActionPreference = "Stop"
+$ArgumentList = $args
 
-if ([System.Environment]::OSVersion.Version -lt (New-Object Version 6,2)) {
+$ReqVer = New-Object Version 4,0
+$PSVersion = $PSVersionTable.PSVersion
+$Protocols = [enum]::GetNames([Net.SecurityProtocolType])
+$ProtTls12 = [Net.SecurityProtocolType]::Tls12
+$WebClient = New-Object Net.WebClient
+
+[string]"This script requires" | ForEach-Object {
+if($IsLinux -or $IsMacOS) {throw "$_ Microsoft Windows Operating System."}
+if($PSVersion -lt $ReqVer) {throw "$_ Windows Management Framework (PowerShell) version 4.0"}
+if($Protocols -notcontains $ProtTls12) {throw "$_ at least .NET Framework version 4.5"}
+}
+
 Write-Verbose "Changing internet security protocol..."
-[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
-}
+[Net.ServicePointManager]::SecurityProtocol = $ProtTls12
 
-Write-Verbose "Downloading Haier_F17A1H OTA Updater Injector script code from GitHub repository..."
-$Repository = 'thefirefox12537/ota_f17a1h_injector'
-$Releases_and_files = 'releases/latest/download/inject-win.bat'
-(New-Object System.Net.WebClient).DownloadFile(
-"http://github.com/$Repository/$Releases_and_files",
-"${env:temp}\inject.bat"
-)
+Write-Verbose "Downloading OTA Haier F17A1H/Andromax Prime Injector Tool script code from GitHub..."
+$Uri = [uri]"http://github.com/thefirefox12537/ota_f17a1h_injector/releases/latest/download/inject-win.bat"
+$BatFile = "${env:temp}\inject.bat"
+$TmpFile = "${env:temp}\run_online.tmp"
+$WebClient.DownloadFile($Uri, $BatFile) | Out-Null
 
-[void](New-Item -itemtype File -path "${env:temp}\run_online.tmp" -value "Run_Online")
-cmd.exe /c call "${env:temp}\inject.bat" @args
+& {New-Item -itemtype File -path $TmpFile | Out-Null}
+& {cmd.exe /e:on /v:on /q /c $BatFile $ArgumentList}
 Write-Verbose "Removing temporary script..."
-foreach ($FileRemove in @("inject.bat", "run_online.tmp")) {
-[void](Remove-Item -literalpath "${env:temp}\$FileRemove")
-}
+$BatFile, $TmpFile | ForEach-Object {Remove-Item -literalpath $_ | Out-Null}

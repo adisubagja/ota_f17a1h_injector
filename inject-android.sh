@@ -5,7 +5,9 @@
 # File update.zip dan batch script inject root dari Adi Subagja
 # File bash script inject dari Faizal Hamzah
 
-for file in "$1" "$2" "$3"
+ARGS="$@"
+
+for file in $ARGS
 do if [ -f "$file" ]
 then
     FILE="$file"
@@ -21,6 +23,7 @@ MAGISKDIR="/data/adb"
 MAGISK="$MAGISKDIR/magisk"
 MAGISK_MODULE="$MAGISKDIR/modules"
 ADBDIR="$MAGISK_MODULE/adb-ndk"
+BASEFILE="$0"
 
 USAGE()
 {
@@ -77,7 +80,7 @@ Special thanks to:
 }
 
 start-adb() {
-    echo "Starting ADB services..."
+    echo -ne "Starting ADB services...\r"
     "$ADBDIR/adb" start-server
 }
 
@@ -98,16 +101,20 @@ remove-temporary() {
 }
 
 pause() {
-    echo -n "Press any key to continue..."
+    echo -n "Press any key to continue . . . "
     read -srn1; echo
 }
 
 
 if [[ $ID -ne 0 ]]
 then
-    echo "This script only allow in root mode."
-    exit 1
-elif [[ $(getprop ro.build.version.sdk) -lt 21 ]]
+    [[ "$run_temporary" ]] && \
+    echo "This command only allow in root mode." || \
+    exec su -c "$SHELL $BASEFILE $@"
+    exit
+fi
+
+if [[ $(getprop ro.build.version.sdk) -lt 21 ]]
 then
     echo "This script cannot be run in older Android version."
     exit 1
@@ -124,7 +131,8 @@ then
     echo "This script requires Magisk installed."
     exit 1
 fi
-case $1 in
+for i in $ARGS
+do case $i in
     "--run-temporary" | "--download-adb"  | "-Q" | "-a" )
         if [ -d "/data/data/com.termux" ]
         then PREFIX="/data/data/com.termux/files/usr"
@@ -144,6 +152,7 @@ case $1 in
     * )
         ;;
 esac
+done
 
 for a in '/dev' '/proc/self'
 do if [[ "$0" = "$a/fd/"* ]]
@@ -155,11 +164,18 @@ then
 fi
 done
 
-case $1 in
+for i in $ARGS
+do case $i in
     "--help" | "-h" )
-        USAGE ;;
+        USAGE
+        break
+        ;;
     "--readme" )
-        README ;;
+        README
+        break
+        ;;
+    "--non-market" | "-n" )
+        NON_MARKET=1 ;;
     "--run-temporary" | "-Q" )
         [ ! -d "/data/local/tmp" ] && \
         mkdir "/data/local/tmp" > /dev/null 2>&1
@@ -174,9 +190,10 @@ case $1 in
     * )
         ;;
 esac
+done
 
 ## Main Menu
-if [[ "$1" ]]
+if [[ "$ARGS" ]]
 then
     [ -z "$FILE" ] && {
         echo "File not found."
@@ -224,10 +241,11 @@ Perlu diperhatikan:
 pause
 
 ## Checking ADB programs
-echo "Checking ADB program..."
+echo -ne "Checking ADB program...\r"
 
 ## Downloading ADB programs if not exist
-case $1 in
+for i in $ARGS
+do case $i in
     "--run-temporary" | "--download-adb" | "-Q" | "-a" )
         if [ ! -e "$ADBDIR/adb" ]
         then
@@ -244,6 +262,7 @@ case $1 in
             done
         else echo "ADB program was successfully placed."
         fi
+        break
         ;;
     * )
         if [ -d "$ADBDIR" ]
@@ -256,23 +275,26 @@ case $1 in
             echo -e "ADB program cannot be found on this device. \nMake sure 'ADB and Fastboot for Android NDK' Magisk Modules already installed."
             exit 1
         fi
+        break
         ;;
 esac
+done
 
 ## Starting ADB service
 start-adb
 
 ## Checking devices
-echo "Connecting to device..."
-sleep 1; echo "Please plug USB to your devices."
+echo -ne "Connecting to device...\r"
+sleep 1; echo -ne "Please plug USB to your devices.\r"
 "$ADBDIR/adb" wait-for-device
-echo "Connected."
+echo "Connected.                      "
 
 ## Checking if your devices is F17A1H
-echo "Checking if your devices is F17A1H..."
+echo -ne "Checking if your devices is F17A1H...\r"
 for FOTA_DEVICE in "$("$ADBDIR/adb" shell "getprop ro.fota.device" 2> /dev/null)"
 do if [ "${FOTA_DEVICE//$'\r'}" != "Andromax F17A1H" ]
 then
+    echo "Checking if your devices is F17A1H..."
     echo "Perangkat anda bukan Andromax Prime/Haier F17A1H"
     "$ADBDIR/adb" kill-server
     remove-temporary
@@ -288,9 +310,9 @@ echo "Activating airplane mode..."
 ## Injecting file
 echo "Preparing version file $FILE to injecting device..."
 "$ADBDIR/adb" push "$FILE" /sdcard/adupsfota/update.zip
-echo "Checking file..."
+echo -ne "Checking file...\r"
 sleep 4
-echo "Verifying file..."
+echo -ne "Verifying file...\r"
 sleep 12
 
 ## Calling FOTA update
@@ -308,23 +330,13 @@ echo "Manipulating FOTA updates..."
 COUNTER=1
 echo "Updating..."
 "$ADBDIR/adb" shell "am start -n com.smartfren.fota/com.adups.fota.FotaInstallDialogActivity"
-while [ $COUNTER -le 20 ]
+while [ $COUNTER -le 25 ]
 do "$ADBDIR/adb" shell "input keyevent 20" > /dev/null 2>&1 && (( COUNTER+=1 ))
 done
 "$ADBDIR/adb" shell "input keyevent 23" > /dev/null 2>&1
 sleep 10
 "$ADBDIR/adb" wait-for-device > /dev/null 2>&1
 
-for args in "$1" "$2" "$3"
-do case $args in
-    "--non-market" | "-n" )
-        NON_MARKET=1
-        break
-        ;;
-    * )
-        ;;
-esac
-done
 if [[ "$NON_MARKET" ]]
 then
     echo "Enabling install non market app..."
@@ -342,18 +354,44 @@ exit 0
 
 # begin of dummy code
 einECflUN24N9YwC2s85Yyaw8yw58yq8lYC5wo8aY38d8y48y48y85Y8Y5aNQ8wK53sy58Y5lejw8Y8y5g8Y58Yy5
-d98Y592Y8Y37Y4wte7t4KnTwRasT278TK78tkbx78t74tk184d215y19t893tywyrweurc7XT2a3a5s87dw7TWU57
-t574t5k7rt7TRT6rweegr4wS4DSaataf565D6529u89288y2y9R28RY98Y9R8yr83y7vy3t7xy3kty8Y8yk7y7TV7
-3YKCEZWFHykDafDrsd4dD7d78DiuihaD7dgAY8DdDdDw8IydYD9yd9YDdAD4sQw4Ra5daqf11oOSJdiHDdUDGElw1
-EwEoPafw1E1d4EkQOWDKnksADJaxMANazagbGDUgf8eiqhwjdoAJFIHUFAIRHAJFBhfIDagsiarfUFSJFHiduAIDY
-78teueiudjADadhBdDffHBhwdwdkjAJDHldAXannazkANXLkHDUayA877a6A5FayaDUA7d8ATD8ada7FA6A7fa6ca
-ca8d8AGD9A9d7ASCHA9SHC9AF0hfssfha9s99Dch9HCa9xiaXA98sh888H8AHD8adaYDYdDASFASGasadD8yf8YFu
-99F8f6sRAw5asfD7aged9u9sfu9FY8yf8U9ADU9AUD9uf9A9y8g6tf7GbK4J4jkQ42OI4H1Ejndk8DY8fqJ58e3Ys
-85YfADgaH9dWRKSKD7du8rr3hIA8Dd3rk8Y889Fyd9a8dy8AD8adBDUadeBDHad8Dd9DIad9DS7F7sfF77Dg9d9DG
-8adAVAhsA89dADaduDJbca7D87s907ad90A7D9A68f8f9Ff6AFad8AS6d8Y9s99gge9s9797F8A7F8AC7ad8D7S7C
-7aza7s7fahaKAHndwDuq12w1ds2f41h8S6A6D5AGDH3UeinECflUN24N9YwC2s85Yyaw8yw58yq8lYC5wo8aY38d8
-y48y48y85Y8Y5aNQ8wK53sy58Y5lejw8Y8y5g8Y58Yy5d98Y592Y8Y37Y4wte7t4KnTwRasT278TK78tkbx78t74t
-k184d215y19t893tywyrweurc7XT2a3a5s87dw7TWU57t574t5k7rt7TRT6rweegr4wS4DSaataf565D6529u8928
-8y2y9R28RY98Y9R8yr83y7vy3t7xy3kty8Y8yk7y7TV73YKCEZWFHykDafDrsd4dD7d78DiuihaD7dgAY8DdDdDw8
-IydYD9yd9YDdAD4sQw4Ra5daqf11oOSJdiHDdUDGElw1EwEoPafw1E1d4EkQOWDKnksADJaxMANazagbGDUgf8eiq
+d98Y592Y8Y37Y4wte7t4KnTwRasT278TK78tkbx78t74tk184d215y19t893tywyrweurc7XT2a3a5s87dw7TWasg
+dU57t574t5k7rt7TRT6rweegr4wS4DSaataf565D6529u89288y2y9R28wngRdsvdsY9dsa4gs62dg8Y9R8yr83y7
+vy3t7xy3kty8Y8yk7y7TVegadf73YKCEZWFHykDafDrsd4dD7d78DiuihaD7dgAY8DdDdDw8IydYD9yd9YDdAD4sQ
+w4Ra5daqf11oOSJdiHDdUwfDGwqElw1EwEoPafw1E1d4EkQOsdbgsdbWDKnksADJaxMAafNazagbGdbsDUgf8eiqh
+wjdoAJFIHetawUfwFAIe51ayq6esfdcersRdbHdAJFrwrhBhgsfdbIDagsiarfUqcfFSadhJFHiduAIgwefDY78te
+ueiudjADadhBdDffHBhwdwdkjAJDHldAXannazkANXLkHwcgDUayA877a6A5FayaDewgweUA7d8ATeawgD8ada7Fg
+eA6sdA7fa6caca8d8AefsdgGDs9aA9d7AgsdSCsafHA9wqctgSHC9gwegwAF0dwehfssfha9s9sdfs9Dch9HgewCa
+9xiaXAvsd98sh8seg88egeH8AdweHbtyD8cewfeadaYDYdDAgeSFwcqrASGasadD8yf8YFu99F8f6sRAw5asfD7ag
+ed9u9sfu9FY8yf8U9ADU9AUD9uf9A9y8g6tf7GbK4J4jkQ42OI4H1Ejndk8DY8fqJ58e3Ys8asf5YsdhtrfADgaH9
+dW4vth624rhRdbdfgerKreehSKfas63gjnD7sdu8rr3hIA8Dd3rk8Y889Fyd9a8dy8AD8a3dv51sdbBDcsdUadeBD
+sfaHad8Dd9DIad9DS7F7sfF77Dg9d9DG8adAVAhsA89dADaduDJbca7D87s907ad90A7D9A68f8f9Ff6AFad8AS6d
+8Y9s99gge9s9797F8A7F8AC7ad8D7S7C7aza7s7fahaKAHndwDuq12w1ds2f41h8cfS6Aawbte6D5shreheAGDfwe
+fH3UeinECflUgwaegN2wcet4Nbfd9YwC2s85Yyaw8yw58yq8lYC5wo8aY38d8y48y48y85Y8Y5aNQ8wK53sy58Y5l
+ejw8Y8y5g8Yaweferh58Yy5gaerd98cfYweah592dhdrerY8Ywntae37Y4wte7t4KnTwRasTdg2sag7s8dfTefKe7
+g8tkbx78t74tk184d215y19t893tywyrweurc7XT2a3a5s87dw7TWgweafUda5sf7t574t5k7rt7TRT6rweegr4wS
+4DSaataf565D6529u89288y2y9R28RY98Y9R8yr83y7vy3t7xy3kty8Y8yk7y7TdsgsVd7f3sdYfdKsadgCEZWfwe
+FfHeyfewkgDeafDrsd4dD7d78DiuihaD7dgAY8DdDdDw8IydYD9yd9YDdAD4sQw4Ra5daqf11oOSJdiHDdUDfGegE
+lw1EwEoPafw1E1d4EkgsdQOW512gsdg3D21K5nksAD64JaxMA4Naza12gbG5D4Ugf8eiqhwjdoAJsFafvIwaegHcU
+gFdAvIcRdweaHAasdgGDgsdgGSFAsdvJweaegFtBw4aw2eTghWfIDg1ag5s5ia4rfUF3dsf1SsdJF5HiduAIasgDY
+7ewg8teueiudjADadhBdDweffgeHgBhwdwdkjAJDHldAXannazkANXLkHDUayA877a6A5FayaDUA7d8aAsdcTD8ad
+a7FAsg6weAg7wfjtrja6ckaca8dsr8heAhGjDjtr9A9trhtdrh7rAScCeagHreA9hSgfHnfgC9bAbgfFn0nhfssfh
+a9s99Dch9HCa9xiaXA98sh8cfsdf84argfse8agHcd8aewfcAewgHD8adaYDYdDegASgFASGasadD8yf8YFu99F8f
+6sRAw5asfD7aged9u9sfu9FY8yf8U9ADU9AUD9uf9A9y8g6tf7GbK4J4jkQ42OI4H1Ejndk8DY8fqJ58e3Ys85YfA
+DgaH9dwrqWRewtetKSdgsaKD7du8rr3hIA8Dd3rk8Y889Fyd9a8d91eu19b2yr39y5rv9235y35w9d2f3Yw59sfY0
+Y9rYawgLe0gsd9Yre2vDedaweg9cRYgew4gny9sadYsa59gsaVLewgffsY5qwqrw28wfa5dwegw832v948Y2492c8
+2Sdt59s8hrthw875A7596A8rwb6896Dfawg84y34f34ct6F89689b54tFscafAS12rvYFWGdasd3tyTC33tdfefaw
+irv3u58ucq32863batvl4e8ytc2q90wcage3ewTw5eahVw2hr3thVgf5b08d2bNdfa0asVgTa2eryhAbaeThUb9sR
+dbUg9OTUw3kYaVwc8tew36cegYweahK8aybe4yTYge3grLearTheYarhicer8h3ehTa8ebryieawtyve48btayu68
+o34wotya38Y3cdsaTChtrsw8YT8warbvwerYT3awbt8YdTgsd8ytjtyYv8eYgaweTgI8YfsT3ty9WYawvtebTKdgs
+IeTdeUefcwedgasdeWfasELrgEFSDhtrjhSAsdgfdB3dgweg8QUrwrbTL90dsg2U59UgsdRUdegwLT8YDGAEH448w
+3ga96b4a6teaog3946utv304qi6by4ojqtodofteu8au38tyaiyty572yvitu3y8tiy23ty8it8wEsfsdFRy3wrv2
+Baged6T3ewgwY3fd4Yga48g64regYw3ex34qrvTtr7hyeft2dsgwe1rn4h14fdbt12U6RurRsbge7ewhenhtRObdf
+bvd8c6bfdb7fd6vY8ct6i8act7DTdgstaI8DThdfgreI7frefbgf4d5ybTDgthtrAdsda7fwefITfwaDGyd3ds4e2
+5ewgFGgwEeDd2a45efwv3Irwavt8w23Ae4byDTDyv4cTO3edgFt56fweqvDA8ayIadggDYge8wAgrYSaify3itlq3
+2tuiq238txt38y3bytseifysidry23ytkiwehfI4Tatdb5gdfsteETaUdgsB39TtrwFe52bfd36baUOsiSAFAfewG
+SWEtvoFfd41gr2ASGoe64wHRa6tbRo421RddasdEHd8f7J9hT3f52g4t21H3g215Re6Te6rg5asa7ssafG8wh87RG
+roFDSOdewtwvetuat8uvti38t253jk53k24t8392y754lkjger8ufoac93tuv9auw3t3owy3watv4ybkj4yiv4tkG
+AeDGjrDdSAgDtWkGlREGajylGaREjHlzJkTsdgjFEiWeDrEut8eEaG32SCoR23FAfsS1sadF21E4yeB54FuHy64s2
+dxa3g3e3tae4iS56tFksd312lr346GeSEagi4wub69aw4t9awuotibyiuae4o9toaweitiweht23itcoitbiewatk
+dsgmkntoyij5ylhero4dfa6ga41gFoo35Kye23aetxsd35byrherage9iu9utaetFwe0239u2vSdh09tu2XoitJu2
 # end of dummy code
